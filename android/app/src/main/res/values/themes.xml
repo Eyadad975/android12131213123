@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.QuakeAlert" parent="android:style/Theme.Material.DayNight.NoActionBar">
+    <style name="Theme.QuakeAlert" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item><item name="android:colorAccent">#d7263d</item>
         <item name="android:navigationBarColor">#101418</item><item name="android:statusBarColor">#101418</item>
     </style>
