@@ -61,6 +61,8 @@ class MainActivity : Activity() {
         root.addView(settings, LinearLayout.LayoutParams(-1, -2).apply { topMargin=28 }); setContentView(root)
         loadMap()
         createNotificationChannel()
+        val serviceIntent=Intent(this, AlertPollingService::class.java)
+        if(Build.VERSION.SDK_INT>=26) startForegroundService(serviceIntent) else startService(serviceIntent)
         requestFullScreenIntentPermission()
         val needed=mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.POST_NOTIFICATIONS)
@@ -94,38 +96,10 @@ class MainActivity : Activity() {
             location.text="USER LOCATION\n%.5f°, %.5f°".format(userLat, userLon)
         }
         val alert=data.optJSONObject("alert"); val q=data.optJSONObject("quake")
-        data.optJSONObject("notification")?.let { notification ->
-            val notificationId=notification.optInt("id",0)
-            if(notificationId>lastNotification) {
-                lastNotification=notificationId
-                showNotification(notification.optString("title","Quake Alert"), notification.optString("body"))
-            }
-        }
         mapView.evaluateJavascript("setUser($userLat,$userLon);", null)
         val id=alert?.optInt("id",0) ?: 0
         if (q!=null && id>lastAlert) {
             lastAlert=id
-            val intent=Intent(this,AlertActivity::class.java)
-                .putExtra("quake",q.toString())
-                .putExtra("user_lat",user?.optDouble("lat",Double.NaN) ?: Double.NaN)
-                .putExtra("user_lon",user?.optDouble("lon",Double.NaN) ?: Double.NaN)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            val pending=PendingIntent.getActivity(this, id, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            val builder=Notification.Builder(this,"quake_alerts")
-                .setSmallIcon(android.R.drawable.ic_dialog_alert)
-                .setContentTitle(if(q.optBoolean("major",false)) "Earthquake warning" else "Earthquake detected")
-                .setContentText("Magnitude %.1f · %.0f km away".format(q.optDouble("mag"),q.optDouble("dist")))
-                .setPriority(if(q.optBoolean("major",false)) Notification.PRIORITY_MAX else Notification.PRIORITY_DEFAULT)
-                .setCategory(if(q.optBoolean("major",false)) Notification.CATEGORY_ALARM else Notification.CATEGORY_EVENT)
-                .setAutoCancel(!q.optBoolean("major",false)).setContentIntent(pending)
-            if(q.optBoolean("major",false)) {
-                builder.setFullScreenIntent(pending,true)
-            }
-            getSystemService(NotificationManager::class.java).notify(id,builder.build())
-            if(q.optBoolean("major",false) && isInForeground()) {
-                runCatching { startActivity(intent) }
-            }
             mapView.evaluateJavascript("showQuake(${q});", null)
         }
     }
