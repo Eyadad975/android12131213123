@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <application android:theme="@style/Theme.QuakeAlert" android:label="@string/app_name" android:allowBackup="true" android:supportsRtl="true">
-        <activity android:name=".AlertActivity" android:exported="false" android:screenOrientation="portrait"
+        <activity android:name=".AlertActivity" android:exported="false" android:launchMode="singleTop" android:screenOrientation="portrait"
             android:showWhenLocked="true" android:turnScreenOn="true" android:excludeFromRecents="true"/>
         <activity android:name=".SettingsActivity" android:exported="false"/>
         <activity android:name=".MainActivity" android:exported="true">

@@ -54,13 +54,14 @@ class MainActivity : Activity() {
                 }
             }
         }
-        card.addView(mapView, LinearLayout.LayoutParams(-1, 260))
+        card.addView(mapView, LinearLayout.LayoutParams(-1, 380))
         card.addView(status); card.addView(location)
         val settings=Button(this).apply { text="SERVER SETTINGS"; setTextColor(Color.WHITE); setOnClickListener { startActivity(Intent(this@MainActivity,SettingsActivity::class.java)) } }
         root.addView(title); root.addView(subtitle); root.addView(card, LinearLayout.LayoutParams(-1, -2))
         root.addView(settings, LinearLayout.LayoutParams(-1, -2).apply { topMargin=28 }); setContentView(root)
         loadMap()
         createNotificationChannel()
+        requestFullScreenIntentPermission()
         val needed=mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.POST_NOTIFICATIONS)
         if (checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.CAMERA)
@@ -99,8 +100,8 @@ class MainActivity : Activity() {
                 lastNotification=notificationId
                 showNotification(notification.optString("title","Quake Alert"), notification.optString("body"))
             }
-            mapView.evaluateJavascript("setUser($userLat,$userLon);", null)
         }
+        mapView.evaluateJavascript("setUser($userLat,$userLon);", null)
         val id=alert?.optInt("id",0) ?: 0
         if (q!=null && id>lastAlert) {
             lastAlert=id
@@ -120,10 +121,25 @@ class MainActivity : Activity() {
                 .setAutoCancel(!q.optBoolean("major",false)).setContentIntent(pending)
             if(q.optBoolean("major",false)) {
                 builder.setFullScreenIntent(pending,true)
-                startActivity(intent)
             }
             getSystemService(NotificationManager::class.java).notify(id,builder.build())
+            if(q.optBoolean("major",false) && isInForeground()) {
+                runCatching { startActivity(intent) }
+            }
             mapView.evaluateJavascript("showQuake(${q});", null)
+        }
+    }
+    private fun isInForeground(): Boolean =
+        !isFinishing && !isDestroyed && hasWindowFocus()
+
+    private fun requestFullScreenIntentPermission() {
+        if(Build.VERSION.SDK_INT >= 34) {
+            val manager=getSystemService(NotificationManager::class.java)
+            if(!manager.canUseFullScreenIntent()) {
+                startActivity(Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT").apply {
+                    data=android.net.Uri.parse("package:$packageName")
+                })
+            }
         }
     }
     private fun loadMap() {
