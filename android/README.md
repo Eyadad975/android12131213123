@@ -4,16 +4,19 @@ This is a self-contained native Kotlin client for the Python earthquake alert
 server. It polls `GET /api/state` once per second while the app is open. Set
 the server address in **Server settings**, for example:
 
-`https://192.168.1.20` (the Python server defaults to HTTPS port 443)
+`https://192.168.1.20:443` (the Python server defaults to HTTPS port 443)
 
 The address must include the scheme and (when non-standard) port. The device
-must be able to reach the computer running the server. For HTTPS deployments,
-use a certificate trusted by Android (or use the server's HTTP listener on a
-trusted local network); the app does not disable TLS certificate validation.
+must be able to reach the computer running the server. For a configured private/local HTTPS server, the Android client uses an
+app-scoped TLS socket factory that accepts that server's self-signed
+certificate. This does not change Android's global trust store or affect any
+other app traffic, but it means the configured local endpoint must be kept
+private and the URL/host should be verified. Public/non-local HTTPS endpoints
+continue to use normal Android certificate validation.
 
 ## Build and install
 
-The repository workflow (`.github/workflows/android.yml`) installs Java 17 and
+The repository workflow (`.github/workflows/main.yml`) installs Java 17 and
 Gradle on GitHub Actions and produces `app-debug.apk` as an artifact. No
 Gradle wrapper is included. Locally, with Android SDK and Gradle installed:
 
@@ -24,12 +27,11 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
 The app requests notification and camera permissions on first launch. From
-**Server settings**, use **Update warning sound from server** to download
+**Server settings**, enter the server URL and use **Update warning sound from server** to download
 `/warning.wav` into private app storage without reinstalling the APK. A major
 alert loops the downloaded sound (falling back to `res/raw/warning.wav`),
 vibrates until dismissed, enables the Camera2 torch when permitted, and posts a
-high-priority notification. The alert displays quake and user latitude/longitude using native
-Android views (no map SDK or external dependency). The main screen displays
-the server location and scheduled-test banner only when the server's
-`schedule.warn` flag is true. Dark/light preference is saved in Settings and
-takes effect on the next app creation.
+high-priority notification. the alert displays a full-screen countdown, quake and user latitude/longitude
+using native Android views (no map SDK or external dependency). Scheduling
+controls are intentionally available only in the web control panel; Android
+only monitors the server and displays live alerts.
