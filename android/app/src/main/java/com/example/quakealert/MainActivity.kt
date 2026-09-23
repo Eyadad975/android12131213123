@@ -10,6 +10,10 @@ import android.graphics.drawable.GradientDrawable
 import android.app.PendingIntent
 import android.view.View
 import android.widget.*
+import android.webkit.SslErrorHandler
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.net.http.SslError
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
@@ -18,9 +22,12 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var status: TextView
     private lateinit var location: TextView
+    private lateinit var mapView: WebView
     private var userLat = 30.0444
     private var userLon = 31.2357
     private var lastAlert = 0
+    private var lastNotification = 0
+    private var loadedMapUrl = ""
     private var polling = false
     private val poll = object : Runnable {
         override fun run() {
@@ -36,18 +43,35 @@ class MainActivity : Activity() {
         val card=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(18,18,18,18); background=cardBackground() }
         status=TextView(this).apply { text="Waiting for earthquake alerts"; textSize=15f; setTextColor(Color.rgb(230,237,243)); setPadding(0,0,0,14) }
         location=TextView(this).apply { text="USER LOCATION\nWaiting for server"; textSize=14f; letterSpacing=.04f; setTextColor(Color.rgb(190,200,212)); setPadding(0,10,0,0) }
-        card.addView(MapMonitorView(this), LinearLayout.LayoutParams(-1, 260))
+        mapView=WebView(this).apply {
+            settings.javaScriptEnabled=true
+            settings.domStorageEnabled=true
+            webViewClient=object: WebViewClient() {
+                override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+                    val host=android.net.Uri.parse(prefs.getString("server_url","https://127.0.0.1")).host
+                    val url=error.url ?: ""
+                    if(host != null && url.contains(host)) handler.proceed() else handler.cancel()
+                }
+            }
+        }
+        card.addView(mapView, LinearLayout.LayoutParams(-1, 260))
         card.addView(status); card.addView(location)
         val settings=Button(this).apply { text="SERVER SETTINGS"; setTextColor(Color.WHITE); setOnClickListener { startActivity(Intent(this@MainActivity,SettingsActivity::class.java)) } }
         root.addView(title); root.addView(subtitle); root.addView(card, LinearLayout.LayoutParams(-1, -2))
         root.addView(settings, LinearLayout.LayoutParams(-1, -2).apply { topMargin=28 }); setContentView(root)
+        loadMap()
         createNotificationChannel()
         val needed=mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.POST_NOTIFICATIONS)
         if (checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.CAMERA)
         if (needed.isNotEmpty()) requestPermissions(needed.toTypedArray(), 10)
     }
-    override fun onResume() { super.onResume(); if (!polling) { polling=true; handler.post(poll) } }
+    override fun onResume() {
+        super.onResume()
+        val configured=prefs.getString("server_url","https://127.0.0.1")!!.trimEnd('/')
+        if(configured != loadedMapUrl) loadMap()
+        if (!polling) { polling=true; handler.post(poll) }
+    }
     // Keep monitoring while the launcher or another app is visible so the
     // full-screen notification can wake the warning activity.
     override fun onPause() { super.onPause() }
@@ -69,6 +93,14 @@ class MainActivity : Activity() {
             location.text="USER LOCATION\n%.5f°, %.5f°".format(userLat, userLon)
         }
         val alert=data.optJSONObject("alert"); val q=data.optJSONObject("quake")
+        data.optJSONObject("notification")?.let { notification ->
+            val notificationId=notification.optInt("id",0)
+            if(notificationId>lastNotification) {
+                lastNotification=notificationId
+                showNotification(notification.optString("title","Quake Alert"), notification.optString("body"))
+            }
+            mapView.evaluateJavascript("setUser($userLat,$userLon);", null)
+        }
         val id=alert?.optInt("id",0) ?: 0
         if (q!=null && id>lastAlert) {
             lastAlert=id
@@ -91,22 +123,22 @@ class MainActivity : Activity() {
                 startActivity(intent)
             }
             getSystemService(NotificationManager::class.java).notify(id,builder.build())
+            mapView.evaluateJavascript("showQuake(${q});", null)
         }
     }
-    private class MapMonitorView(context: Context): View(context) {
-        private val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-        override fun onDraw(c: android.graphics.Canvas) {
-            val w=width.toFloat(); val h=height.toFloat()
-            paint.color=Color.rgb(18,25,34); c.drawRect(0f,0f,w,h,paint)
-            paint.color=Color.rgb(40,52,65); paint.strokeWidth=1f
-            for(x in 0..width step 42) c.drawLine(x.toFloat(),0f,x.toFloat(),h,paint)
-            for(y in 0..height step 42) c.drawLine(0f,y.toFloat(),w,y.toFloat(),paint)
-            paint.style=android.graphics.Paint.Style.STROKE; paint.color=Color.rgb(255,69,58); paint.strokeWidth=2f
-            val cx=w*.58f; val cy=h*.48f
-            c.drawCircle(cx,cy,34f,paint); c.drawCircle(cx,cy,72f,paint); c.drawCircle(cx,cy,112f,paint)
-            paint.style=android.graphics.Paint.Style.FILL; paint.color=Color.rgb(255,69,58); c.drawCircle(cx,cy,8f,paint)
-            paint.color=Color.rgb(47,129,247); c.drawCircle(w*.35f,h*.64f,7f,paint)
-        }
+    private fun loadMap() {
+        val base=prefs.getString("server_url","https://127.0.0.1")!!.trimEnd('/')
+        loadedMapUrl=base
+        mapView.loadUrl("$base/map")
+    }
+    private fun showNotification(title: String, body: String) {
+        getSystemService(NotificationManager::class.java).notify(
+            1000 + lastNotification,
+            Notification.Builder(this,"quake_alerts")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title).setContentText(body)
+                .setPriority(Notification.PRIORITY_DEFAULT).setAutoCancel(true).build()
+        )
     }
     private fun cardBackground() = GradientDrawable().apply {
         setColor(Color.rgb(27,34,44)); cornerRadius=24f
