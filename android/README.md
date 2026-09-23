@@ -26,12 +26,19 @@ gradle assembleDebug
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The app requests notification and camera permissions on first launch. From
+The app requests notification and camera permissions on first launch. The main
+screen uses the web monitor's dark HUD styling and map/radar presentation.
+Minor earthquakes are delivered as ordinary notifications without opening the
+warning screen. Major earthquakes use a high-priority notification with a
+full-screen intent, so the red warning can appear over the lock screen or
+another app (subject to the device's notification and full-screen policies).
+From
 **Server settings**, enter the server URL and use **Update warning sound from server** to download
 `/warning.wav` into private app storage without reinstalling the APK. A major
 alert loops the downloaded sound (falling back to `res/raw/warning.wav`),
-vibrates until dismissed, enables the Camera2 torch when permitted, and posts a
-high-priority notification. the alert displays a full-screen countdown, quake and user latitude/longitude
+vibrates until dismissed, repeatedly flashes the Camera2 torch when permitted,
+and posts a high-priority notification. The alert displays a full-screen
+countdown, quake and user latitude/longitude
 using native Android views (no map SDK or external dependency). Scheduling
 controls are intentionally available only in the web control panel; Android
 only monitors the server and displays live alerts.
