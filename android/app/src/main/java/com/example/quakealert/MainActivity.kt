@@ -8,6 +8,7 @@ import android.os.*
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.app.PendingIntent
+import android.view.View
 import android.widget.*
 import org.json.JSONObject
 import kotlin.concurrent.thread
