@@ -3,14 +3,13 @@ package com.example.quakealert
 import android.app.*
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.net.http.SslError
 import android.os.*
 import android.view.Gravity
+import android.view.View
 import android.webkit.SslErrorHandler
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Button
 import android.widget.FrameLayout
 
 class MainActivity : Activity() {
@@ -47,23 +46,26 @@ class MainActivity : Activity() {
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.rgb(13, 17, 23))
             addView(mapView, FrameLayout.LayoutParams(-1, -1))
-            addView(Button(this@MainActivity).apply {
-                text = "Settings"
-                textSize = 12f
-                setTextColor(Color.WHITE)
-                background = GradientDrawable().apply {
-                    setColor(Color.argb(225, 13, 17, 23))
-                    cornerRadius = 18f
-                }
+        }
+        var cornerTaps = 0
+        fun addCornerHitArea(gravity: Int) {
+            root.addView(View(this).apply {
+                isClickable = true
                 setOnClickListener {
-                    startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                    cornerTaps++
+                    if (cornerTaps >= 15) {
+                        cornerTaps = 0
+                        startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                    }
                 }
-            }, FrameLayout.LayoutParams(110, 52).apply {
-                gravity = Gravity.TOP or Gravity.END
-                topMargin = 18
-                rightMargin = 18
+            }, FrameLayout.LayoutParams(dp(140), dp(140)).apply {
+                this.gravity = gravity
             })
         }
+        addCornerHitArea(Gravity.TOP or Gravity.START)
+        addCornerHitArea(Gravity.TOP or Gravity.END)
+        addCornerHitArea(Gravity.BOTTOM or Gravity.START)
+        addCornerHitArea(Gravity.BOTTOM or Gravity.END)
         setContentView(root)
         loadMap()
         createNotificationChannel()
@@ -97,6 +99,9 @@ class MainActivity : Activity() {
         loadedMapUrl = base
         mapView.loadUrl("$base/map")
     }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
