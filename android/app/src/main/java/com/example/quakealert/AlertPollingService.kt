@@ -3,6 +3,8 @@ package com.example.quakealert
 import android.app.*
 import android.content.Intent
 import android.os.*
+import android.media.AudioAttributes
+import android.net.Uri
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
@@ -74,17 +76,16 @@ class AlertPollingService : Service() {
         val pending = PendingIntent.getActivity(
             this, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val builder = Notification.Builder(this, "quake_alerts")
+        val builder = Notification.Builder(this, if (major) "quake_major" else "quake_minor")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle(if (major) "Earthquake warning" else "Earthquake detected")
             .setContentText("Magnitude %.1f · %.0f km away".format(quake.optDouble("mag"), quake.optDouble("dist")))
             .setPriority(if (major) Notification.PRIORITY_MAX else Notification.PRIORITY_DEFAULT)
             .setCategory(if (major) Notification.CATEGORY_ALARM else Notification.CATEGORY_EVENT)
-            .setAutoCancel(!major)
-            .setContentIntent(pending)
+            .setAutoCancel(false)
         if (major) {
+            builder.setContentIntent(pending)
             builder.setFullScreenIntent(pending, true)
-            builder.setChannelId("quake_major")
         }
         getSystemService(NotificationManager::class.java).notify(id, builder.build())
     }
@@ -107,6 +108,17 @@ class AlertPollingService : Service() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel("quake_major", "Major earthquake warnings", NotificationManager.IMPORTANCE_HIGH).apply {
                     setSound(null, null)
+                }
+            )
+            getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel("quake_minor", "Minor earthquake alerts", NotificationManager.IMPORTANCE_HIGH).apply {
+                    setSound(
+                        Uri.parse("android.resource://$packageName/${R.raw.warning}"),
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
                 }
             )
         }
