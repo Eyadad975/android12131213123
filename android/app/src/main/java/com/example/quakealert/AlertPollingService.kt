@@ -3,7 +3,7 @@ package com.example.quakealert
 import android.app.*
 import android.content.Intent
 import android.os.*
-import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.net.Uri
 import org.json.JSONObject
 import kotlin.concurrent.thread
@@ -11,6 +11,7 @@ import kotlin.concurrent.thread
 class AlertPollingService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("settings", MODE_PRIVATE) }
+    private var minorPlayer: MediaPlayer? = null
     private val poll = object : Runnable {
         override fun run() {
             thread { fetchState() }
@@ -86,8 +87,36 @@ class AlertPollingService : Service() {
         if (major) {
             builder.setContentIntent(pending)
             builder.setFullScreenIntent(pending, true)
+        } else {
+            playMinorWarning()
         }
         getSystemService(NotificationManager::class.java).notify(id, builder.build())
+    }
+
+    private fun playMinorWarning() {
+        minorPlayer?.release()
+        minorPlayer = MediaPlayer().also { player ->
+            try {
+                val downloaded = java.io.File(filesDir, "warning.wav")
+                if (downloaded.isFile && downloaded.length() > 0) {
+                    player.setDataSource(downloaded.absolutePath)
+                } else {
+                    player.setDataSource(
+                        this,
+                        Uri.parse("android.resource://$packageName/${R.raw.warning}")
+                    )
+                }
+                player.setOnCompletionListener {
+                    it.release()
+                    if (minorPlayer === it) minorPlayer = null
+                }
+                player.prepare()
+                player.start()
+            } catch (_: Exception) {
+                player.release()
+                minorPlayer = null
+            }
+        }
     }
 
     private fun postInfo(title: String, body: String) {
@@ -112,13 +141,7 @@ class AlertPollingService : Service() {
             )
             getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel("quake_minor", "Minor earthquake alerts", NotificationManager.IMPORTANCE_HIGH).apply {
-                    setSound(
-                        Uri.parse("android.resource://$packageName/${R.raw.warning}"),
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
+                    setSound(null, null)
                 }
             )
         }
@@ -126,6 +149,7 @@ class AlertPollingService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(poll)
+        minorPlayer?.release()
         super.onDestroy()
     }
 

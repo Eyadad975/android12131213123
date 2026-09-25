@@ -1,7 +1,9 @@
 package com.example.quakealert
 
 import android.app.*
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.http.SslError
 import android.os.*
@@ -69,10 +71,27 @@ class MainActivity : Activity() {
         setContentView(root)
         loadMap()
         createNotificationChannel()
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 20)
+        } else {
+            startMonitoring()
+        }
+        permissionHandler.post(permissionPrompt)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, results: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, results)
+        if (requestCode == 20) startMonitoring()
+    }
+
+    private fun startMonitoring() {
         val serviceIntent = Intent(this, AlertPollingService::class.java)
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
         else startService(serviceIntent)
-        permissionHandler.post(permissionPrompt)
     }
 
     override fun onResume() {

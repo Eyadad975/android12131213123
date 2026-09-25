@@ -42,6 +42,7 @@ class SettingsActivity : Activity() {
                         connection.inputStream.use { input -> temporary.outputStream().use { output -> input.copyTo(output) } }
                         connection.disconnect()
                         val target=java.io.File(filesDir,"warning.wav")
+                        if(target.exists() && !target.delete()) throw IllegalStateException("Could not replace existing sound")
                         if(!temporary.renameTo(target)) throw IllegalStateException("Could not save sound")
                         runOnUiThread { soundStatus.text="Warning sound updated successfully."; isEnabled=true }
                     } catch(error: Exception) {
