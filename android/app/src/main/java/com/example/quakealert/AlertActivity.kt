@@ -34,7 +34,7 @@ class AlertActivity : Activity() {
         val q=JSONObject(intent.getStringExtra("quake") ?: "{}")
         val userLat=intent.getDoubleExtra("user_lat",Double.NaN)
         val userLon=intent.getDoubleExtra("user_lon",Double.NaN)
-        seconds=q.optInt("countdown", 10).coerceIn(0, 99)
+        seconds=q.optInt("seconds", q.optInt("countdown", 10)).coerceIn(0, 3600)
         val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER; setPadding(26,20,26,18); background=GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(122,0,18),Color.rgb(207,25,48))) }
         root.addView(TextView(this).apply { text="EARTHQUAKE WARNING"; textSize=27f; letterSpacing=.06f; setTextColor(Color.WHITE); gravity=Gravity.CENTER; setTypeface(null,1) })
         countdown=TextView(this).apply { text="$seconds"; textSize=86f; setTextColor(Color.WHITE); gravity=Gravity.CENTER; setTypeface(null,1); setPadding(0,20,0,0) }
